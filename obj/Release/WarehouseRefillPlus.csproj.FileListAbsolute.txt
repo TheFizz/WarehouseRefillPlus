@@ -1,0 +1,10 @@
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.deps.json
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.dll
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.pdb
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.csproj.AssemblyReference.cache
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.GeneratedMSBuildEditorConfig.editorconfig
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.csproj.CoreCompileInputs.cache
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.dll
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\refint\WarehouseRefillPlus.dll
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.pdb
+D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\ref\WarehouseRefillPlus.dll
