@@ -48,23 +48,23 @@ namespace WarehouseRefillPlus.Patches
             MarketShoppingCartLimitTools.Apply(__instance);
         }
 
+        // These methods may be queried by the market UI many times per frame.
+        // Returning the desired result directly avoids repeatedly touching the cart
+        // state and the maxed indicator in a hot path.
         [HarmonyPatch(nameof(MarketShoppingCart.CartMaxed))]
         [HarmonyPrefix]
-        public static bool CartMaxed_Prefix(MarketShoppingCart __instance, ref bool __result)
+        public static bool CartMaxed_Prefix(ref bool __result)
         {
-            MarketShoppingCartLimitTools.Apply(__instance);
             __result = false;
             return false;
         }
 
         [HarmonyPatch(nameof(MarketShoppingCart.CartMaxedPassive))]
         [HarmonyPrefix]
-        public static bool CartMaxedPassive_Prefix(MarketShoppingCart __instance, ref bool __result)
+        public static bool CartMaxedPassive_Prefix(ref bool __result)
         {
-            MarketShoppingCartLimitTools.Apply(__instance);
             __result = false;
             return false;
         }
     }
 }
-

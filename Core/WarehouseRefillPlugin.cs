@@ -11,7 +11,7 @@ using WarehouseRefillPlus.UI;
 
 namespace WarehouseRefillPlus.Core
 {
-    [BepInPlugin("thefizz.warehouserefillplus", "Warehouse Refill Plus", "1.0.0")]
+    [BepInPlugin("WarehouseRefillPlus", "Warehouse Refill Plus", "3.2.0")]
     public class WarehouseRefillPlugin : BasePlugin
     {
         public static readonly Dictionary<int, int> ProductLimits = new Dictionary<int, int>();
@@ -25,7 +25,7 @@ namespace WarehouseRefillPlus.Core
             LoadLimits();
             ClassInjector.RegisterTypeInIl2Cpp<MarketAppUIEnhancer>();
             SceneManager.add_sceneLoaded(new Action<Scene, LoadSceneMode>(OnSceneLoaded));
-            Harmony harmony = new Harmony("thefizz.warehouserefillplus.patch");
+            Harmony harmony = new Harmony("WarehouseRefillPlus.patch");
             harmony.PatchAll();
             Log.LogInfo($"Load successful!");
         }

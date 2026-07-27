@@ -1,0 +1,13 @@
+# Foldery z plikami tymczasowymi i skompilowanymi Visual Studio
+[Bb]in/
+[Oo]bj/
+
+# Ukryty folder z prywatnymi ustawieniami wyglądu Visual Studio
+.vs/
+
+# Pliki konfiguracyjne specyficzne dla Twojego komputera
+*.user
+
+# Paczki zip (gotowego moda udostępnia się inaczej, nie wrzuca do kodu)
+*.zip
+*.rar

@@ -1,29 +1,32 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Workspace\\Common\\Modding\\Supermarket Simulator\\WarehouseRefill\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {}
+    "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {}
   },
   "projects": {
-    "D:\\Workspace\\Common\\Modding\\Supermarket Simulator\\WarehouseRefill\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {
-      "version": "1.0.0",
+    "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {
+      "version": "3.2.0",
       "restore": {
-        "projectUniqueName": "D:\\Workspace\\Common\\Modding\\Supermarket Simulator\\WarehouseRefill\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
+        "projectUniqueName": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
         "projectName": "WarehouseRefillPlus",
-        "projectPath": "D:\\Workspace\\Common\\Modding\\Supermarket Simulator\\WarehouseRefill\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
-        "packagesPath": "C:\\Users\\TheFizz\\.nuget\\packages\\",
-        "outputPath": "D:\\Workspace\\Common\\Modding\\Supermarket Simulator\\WarehouseRefill\\WarehouseRefillPlus\\obj\\",
+        "projectPath": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
+        "packagesPath": "C:\\Users\\tmjci\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\TheFizz\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\tmjci\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net6.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net6.0": {
+            "framework": "net6.0",
             "targetAlias": "net6.0",
             "projectReferences": {}
           }
@@ -38,10 +41,11 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net6.0": {
+          "framework": "net6.0",
           "targetAlias": "net6.0",
           "imports": [
             "net461",
@@ -59,7 +63,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400-preview.0.26322.102\\RuntimeIdentifierGraph.json"
         }
       }
     }
