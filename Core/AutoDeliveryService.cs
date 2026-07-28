@@ -41,46 +41,54 @@ namespace WarehouseRefillPlus.Core
             }
         }
 
-        // --- METODA 1: Bezpośredni wtrysk na regał (Dla dostaw) ---
-        // --- METODA 1: Bezpośredni wtrysk na regał (Dla dostaw) ---
+        // --- METODA 1: Natywne odkładanie bez udziału gracza (Dla dostaw) ---
         private static bool TryStoreBoxSilently(Box box, RackManager rackManager)
         {
             foreach (Rack rack in rackManager.m_Racks)
             {
                 if (rack == null) continue;
+
                 foreach (RackSlot slot in rack.RackSlots)
                 {
-                    if (slot != null && slot.Data != null && slot.Data.ProductID == box.Data.ProductID)
+                    if (slot == null ||
+                        slot.Data == null ||
+                        slot.Data.ProductID != box.Data.ProductID ||
+                        slot.Full)
                     {
-                        if (!slot.Full)
+                        continue;
+                    }
+
+                    try
+                    {
+                        // Zatrzymujemy fizykę przed przekazaniem pudełka do RackSlot,
+                        // ale NIE zmieniamy rodzica, pozycji ani rotacji ręcznie.
+                        Rigidbody rb = box.GetComponent<Rigidbody>();
+                        if (rb != null)
                         {
-                            try
-                            {
-                                Rigidbody rb = box.GetComponent<Rigidbody>();
-                                if (rb != null) rb.isKinematic = true;
-
-                                // --- KRYTYCZNE POPRAWKI ---
-                                // 1. Mówimy grze, że ten karton oficjalnie należy do regału
-                                box.Racked = true;
-
-                                box.transform.SetParent(slot.transform);
-                                box.transform.localRotation = Quaternion.identity;
-
-                                // 2. Flaga 'true' synchronizuje grafikę (Instancing)
-                                slot.AddBox(box.BoxID, box, true);
-
-                                // 3. Zamrażamy fizykę kartonu, by był częścią mebla
-                                try { box.SetStatic(true); } catch { }
-                            }
-                            catch (System.Exception ex)
-                            {
-                                WarehouseRefillPlugin.Instance.Log.LogError($"Błąd cichego układania: {ex.Message}");
-                            }
-                            return true;
+                            rb.velocity = Vector3.zero;
+                            rb.angularVelocity = Vector3.zero;
+                            rb.isKinematic = true;
                         }
+
+                        // RackSlot.AddBox sam ustawia właściwy parent, localPosition,
+                        // localRotation oraz układ pudełka w slocie.
+                        slot.AddBox(box.BoxID, box, true);
+
+                        // Flagi ustawiamy dopiero po natywnym dodaniu do regału.
+                        box.Racked = true;
+                        try { box.SetStatic(true); } catch { }
+
+                        return true;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        WarehouseRefillPlugin.Instance.Log.LogError(
+                            $"Błąd cichego układania: {ex.Message}");
+                        return false;
                     }
                 }
             }
+
             return false;
         }
 
