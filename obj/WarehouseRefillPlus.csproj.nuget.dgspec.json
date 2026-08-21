@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {}
+    "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {}
   },
   "projects": {
-    "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {
-      "version": "3.2.0",
+    "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj": {
+      "version": "3.2.3",
       "restore": {
-        "projectUniqueName": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
+        "projectUniqueName": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
         "projectName": "WarehouseRefillPlus",
-        "projectPath": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
-        "packagesPath": "C:\\Users\\tmjci\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\tmjci\\OneDrive\\repos\\WarehouseRefillPlus\\obj\\",
+        "projectPath": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
+        "packagesPath": "C:\\Users\\tmjci.DESKTOP-SBSICJ8\\.nuget\\packages\\",
+        "outputPath": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\tmjci\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\tmjci.DESKTOP-SBSICJ8\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -63,7 +63,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400-preview.0.26322.102\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400\\RuntimeIdentifierGraph.json"
         }
       }
     }

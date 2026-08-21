@@ -6,9 +6,9 @@
     <Platforms>AnyCPU</Platforms>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <PackageId>WarehouseRefillPlus</PackageId>
-    <Version>3.2.3</Version>
-    <AssemblyVersion>3.2.3</AssemblyVersion>
-    <FileVersion>3.2.3</FileVersion>
+    <Version>3.2.1</Version>
+    <AssemblyVersion>3.2.1</AssemblyVersion>
+    <FileVersion>3.2.1</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -24,45 +24,45 @@
 
   <ItemGroup>
     <Reference Include="0Harmony">
-      <HintPath>$(RefsRoot)\core\0Harmony.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\core\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(RefsRoot)\interop\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Core">
-      <HintPath>$(RefsRoot)\core\BepInEx.Core.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\core\BepInEx.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx.Unity.IL2CPP">
-      <HintPath>$(RefsRoot)\core\BepInEx.Unity.IL2CPP.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Il2CppInterop.Runtime">
-      <HintPath>$(RefsRoot)\core\Il2CppInterop.Runtime.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Il2Cppmscorlib">
-      <HintPath>$(RefsRoot)\interop\Il2Cppmscorlib.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\Il2Cppmscorlib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>$(RefsRoot)\interop\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\Unity.TextMeshPro.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(RefsRoot)\interop\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>$(RefsRoot)\interop\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>$(RefsRoot)\interop\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>$(RefsRoot)\interop\UnityEngine.UI.dll</HintPath>
+      <HintPath>..\..\..\Desktop 2\Nowa instancja SS\BepInEx\interop\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -77,12 +77,6 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;$(GameRoot)\BepInEx\plugins&quot;" />
+    <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;C:\Users\tmjci\Desktop 2\Nowa instancja SS\BepInEx\plugins&quot;" />
   </Target>
-  <!-- Portable cloud paths (SupermarketSimulator_Dev) -->
-  <PropertyGroup Label="CloudPaths">
-    <RefsRoot>$(MSBuildProjectDirectory)\..\..\References\BepInEx</RefsRoot>
-    <GameRoot>$(MSBuildProjectDirectory)\..\..\Game</GameRoot>
-  </PropertyGroup>
-
 </Project>

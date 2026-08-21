@@ -24,6 +24,8 @@ namespace WarehouseRefillPlus.UI
         private static readonly Dictionary<string, Sprite> SpriteCache = new();
 
         private float _checkTimer;
+        private float _marketOpenReadyTimer;
+        private bool _queueReadyLogged;
         private MarketShoppingCart _cart;
         private Computer _computer;
         private Transform _marketContentCache;
@@ -37,29 +39,95 @@ namespace WarehouseRefillPlus.UI
         private static TMP_InputField _globalInput;
         private static TextMeshProUGUI _editingText;
         private readonly Dictionary<string, Vector3> _originalPositions = new();
+        private readonly List<RectTransform> _smartLimitGroups = new();
+
+        // MAX label position and font scale come from WarehouseRefillPlugin.
+        // By default those values are hardcoded. If ShowMaxLabelConfig is changed
+        // to true in WarehouseRefillPlugin, the same properties read ConfigEntry
+        // values live instead.
+        private const float MaxFontAbsoluteMin = 6f;
+        private const float MaxFontAbsoluteMax = 30f;
+
+        private const string MaxDebugBuild = "2026-08-21-D13-CLEAR-RECT";
+        private bool _maxDebugStartupLogged;
+        private static readonly Dictionary<int, string> MaxDebugLastState = new();
+        private static readonly Dictionary<int, Vector3> MaxDebugExpectedLocal = new();
+        private static readonly HashSet<int> MaxGroupsWithValidAnchor = new();
 
         public void Update()
         {
+            if (!_maxDebugStartupLogged)
+            {
+                _maxDebugStartupLogged = true;
+                LogMaxDebug(
+                    $"BUILD {MaxDebugBuild} loaded. " +
+                    $"2col=({WarehouseRefillPlugin.MaxLabelTwoColumnOffsetXValue:0.##}," +
+                    $"{WarehouseRefillPlugin.MaxLabelTwoColumnOffsetYValue:0.##}) " +
+                    $"scale={WarehouseRefillPlugin.MaxLabelTwoColumnTextScaleValue:0.##} " +
+                    $"3col=({WarehouseRefillPlugin.MaxLabelThreeColumnOffsetXValue:0.##}," +
+                    $"{WarehouseRefillPlugin.MaxLabelThreeColumnOffsetYValue:0.##}) " +
+                    $"scale={WarehouseRefillPlugin.MaxLabelThreeColumnTextScaleValue:0.##}");
+            }
+
             if (Input.GetKeyDown(KeyCode.F2))
             {
                 ClearCartNow();
             }
 
-            bool hasQueue = UIQueue.Count > 0 && _marketContentCache != null && _marketContentCache.gameObject != null &&
-                            _marketContentCache.gameObject.activeInHierarchy;
-            if (hasQueue)
+            // This component is now created only after Main Scene is loaded and
+            // SalesItem.Start tells us that the Market product UI exists. Give the
+            // native Market layout a short moment to finish its own layout pass,
+            // then process queued cards directly. Do NOT wait for
+            // _marketContentCache here: that cache is discovered by the slower
+            // 0.5-second scan below and was blocking the whole MAX queue.
+            _marketOpenReadyTimer += Time.deltaTime;
+
+            if (_marketOpenReadyTimer >= 0.35f && UIQueue.Count > 0)
             {
+                if (!_queueReadyLogged)
+                {
+                    _queueReadyLogged = true;
+                    LogMaxDebug(
+                        $"QUEUE READY delay={_marketOpenReadyTimer:0.00}s " +
+                        $"queued={UIQueue.Count} marketCache={(_marketContentCache is not null)}");
+                }
+
                 int jobsProcessed = 0;
-                while (UIQueue.Count > 0 && jobsProcessed < 6)
+                int jobsToInspect = Mathf.Min(UIQueue.Count, 12);
+
+                while (UIQueue.Count > 0 &&
+                       jobsProcessed < 6 &&
+                       jobsToInspect > 0)
                 {
                     UIJob job = UIQueue[0];
                     UIQueue.RemoveAt(0);
-                    if (job != null && job.Parent != null && job.Parent.gameObject != null)
+                    jobsToInspect--;
+
+                    if (job is null ||
+                        job.Parent is null ||
+                        job.Parent.gameObject is null)
                     {
-                        BuildLightweightUI(job.Parent, job.ProductId, job.Font);
-                        QueuedParents.Remove(job.Parent.GetInstanceID());
+                        jobsProcessed++;
+                        continue;
                     }
 
+                    // If Unity has created the SalesItem but its hierarchy is not
+                    // active yet, keep the job for the next frame instead of losing it.
+                    if (!job.Parent.gameObject.activeInHierarchy)
+                    {
+                        UIQueue.Add(job);
+                        continue;
+                    }
+
+                    int parentId = job.Parent.GetInstanceID();
+
+                    LogMaxDebug(
+                        $"QUEUE PROCESS product={job.ProductId} " +
+                        $"parent='{job.Parent.name}' id={parentId} " +
+                        $"queuedBefore={UIQueue.Count + 1}");
+
+                    BuildLightweightUI(job.Parent, job.ProductId, job.Font);
+                    QueuedParents.Remove(parentId);
                     jobsProcessed++;
                 }
             }
@@ -90,6 +158,7 @@ namespace WarehouseRefillPlus.UI
                 CheckAndCreateClearButton();
                 ToggleRefillButtonVisibility();
                 ApplyUIPositions();
+                RefreshSmartLimitLayouts();
             }
         }
 
@@ -317,11 +386,14 @@ namespace WarehouseRefillPlus.UI
             groupObj.layer = parent.gameObject.layer;
             LayoutElement layoutElement = groupObj.AddComponent<LayoutElement>();
             layoutElement.ignoreLayout = true;
-            groupRt.anchorMin = new Vector2(1f, 0.5f);
-            groupRt.anchorMax = new Vector2(1f, 0.5f);
-            groupRt.pivot = new Vector2(1f, 0.5f);
-            groupRt.anchoredPosition = new Vector2(-65f, -37f);
-            groupRt.sizeDelta = new Vector2(48f, 22f);
+            // Start with a safe fallback position. The final position is aligned
+            // dynamically under the lowest stock-count number in the product card,
+            // so it follows both the wide and compact market layouts.
+            groupRt.anchorMin = new Vector2(1f, 0f);
+            groupRt.anchorMax = new Vector2(1f, 0f);
+            groupRt.pivot = new Vector2(1f, 0f);
+            groupRt.anchoredPosition = new Vector2(-70f, 8f);
+            groupRt.sizeDelta = new Vector2(58f, 16f);
             Button groupButton = groupObj.AddComponent<Button>();
             groupButton.targetGraphic = null;
             GameObject textObj = new GameObject("Text");
@@ -335,6 +407,8 @@ namespace WarehouseRefillPlus.UI
             tmpText.fontSize = 10f;
             tmpText.color = Color.white;
             tmpText.alignment = TextAlignmentOptions.Right;
+            tmpText.enableWordWrapping = false;
+            tmpText.overflowMode = TextOverflowModes.Overflow;
             if (font is not null)
             {
                 tmpText.font = font;
@@ -344,7 +418,391 @@ namespace WarehouseRefillPlus.UI
                 ? userLimit
                 : GetMaxBoxCapacity(productId);
             tmpText.text = $"Max: {currentLimit}";
+
+            LogMaxDebug(
+                $"BUILD MAX product={productId} parent='{parent.name}' " +
+                $"cardActive={parent.gameObject.activeInHierarchy}");
+
+            RectTransform cardRt = parent.GetComponent<RectTransform>();
+            if (cardRt is null)
+            {
+                LogMaxDebug(
+                    $"CARD RECT MISSING product={productId} parent='{parent.name}' " +
+                    $"transformType={parent.GetType().FullName}");
+            }
+            else
+            {
+                ApplySmartLimitLayout(cardRt, groupRt, tmpText);
+            }
+            _smartLimitGroups.Add(groupRt);
             groupButton.onClick.AddListener((Action)(() => { OpenGlobalEdit(productId, tmpText, groupRt, font); }));
+        }
+
+        private void RefreshSmartLimitLayouts()
+        {
+            // The UI manager is persistent, but MarketAppUIStateReset clears this
+            // runtime list on a Single scene load. SalesItem cards can already have
+            // their SmartLimitButtonGroup objects at that point, so the visible MAX
+            // labels survive while the enhancer forgets their RectTransforms.
+            // Re-adopt those existing groups before trying to refresh their layout.
+            if (_smartLimitGroups.Count == 0)
+            {
+                AdoptExistingSmartLimitGroups();
+            }
+
+            for (int i = _smartLimitGroups.Count - 1; i >= 0; i--)
+            {
+                RectTransform groupRt = _smartLimitGroups[i];
+                if (groupRt is null || groupRt.gameObject is null || groupRt.parent is null)
+                {
+                    _smartLimitGroups.RemoveAt(i);
+                    continue;
+                }
+
+                RectTransform cardRt = groupRt.parent.GetComponent<RectTransform>();
+                TextMeshProUGUI label = groupRt.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (cardRt is null || label is null)
+                {
+                    continue;
+                }
+
+                // Computer Fullscreen keeps both market-card layouts around and
+                // toggles which hierarchy is active. Never reposition a hidden
+                // layout: all of its native TMP counters are inactive at that
+                // moment, which used to force our MAX label into FALLBACK.
+                if (!cardRt.gameObject.activeInHierarchy ||
+                    !groupRt.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                ApplySmartLimitLayout(cardRt, groupRt, label);
+            }
+        }
+
+        private void AdoptExistingSmartLimitGroups()
+        {
+            Transform root = _marketContentCache;
+            if (root is null || root.gameObject is null)
+            {
+                return;
+            }
+
+            int adopted = 0;
+
+            // FindMarketContent identifies Content by checking that its direct
+            // children are SalesItem cards. Scanning those direct children is much
+            // cheaper than walking every RectTransform below the market UI.
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform card = root.GetChild(i);
+                if (card is null || card.gameObject is null)
+                {
+                    continue;
+                }
+
+                Transform existing = card.Find("SmartLimitButtonGroup");
+                RectTransform groupRt = existing.GetComponent<RectTransform>();
+                if (groupRt is null || groupRt.gameObject is null)
+                {
+                    continue;
+                }
+
+                _smartLimitGroups.Add(groupRt);
+                adopted++;
+            }
+
+            if (adopted > 0)
+            {
+                LogMaxDebug(
+                    $"ADOPT adopted={adopted} tracked={_smartLimitGroups.Count} " +
+                    $"market={root.name} cards={root.childCount}");
+            }
+        }
+
+        private static void ApplySmartLimitLayout(RectTransform cardRt, RectTransform groupRt, TextMeshProUGUI label)
+        {
+            if (cardRt is null || groupRt is null || label is null)
+            {
+                return;
+            }
+
+            int groupId = groupRt.GetInstanceID();
+
+            if (MaxDebugExpectedLocal.TryGetValue(groupId, out Vector3 expectedBefore))
+            {
+                Vector3 actualBefore = groupRt.localPosition;
+                if ((actualBefore - expectedBefore).sqrMagnitude > 0.25f)
+                {
+                    LogMaxDebug(
+                        $"OVERWRITE group={groupRt.name} card={cardRt.name} " +
+                        $"expectedLocal={FormatVector(expectedBefore)} actualBefore={FormatVector(actualBefore)}");
+                }
+            }
+
+            if (TryPositionLimitUnderStockCount(cardRt, groupRt, label))
+            {
+                return;
+            }
+
+            // The game's market UI can briefly disable/clear Item Count Text while
+            // it refreshes filters/layout. Once this MAX group has already been
+            // positioned from a real native counter, keep that last good position
+            // instead of jumping to FALLBACK. That jump was the visible flicker in
+            // the 3-column view.
+            if (MaxGroupsWithValidAnchor.Contains(groupId) &&
+                MaxDebugExpectedLocal.TryGetValue(groupId, out Vector3 stableLocal))
+            {
+                groupRt.anchorMin = new Vector2(0.5f, 0.5f);
+                groupRt.anchorMax = new Vector2(0.5f, 0.5f);
+                groupRt.pivot = new Vector2(1f, 1f);
+                groupRt.sizeDelta = new Vector2(58f, 16f);
+                groupRt.localPosition = stableLocal;
+
+                LogMaxState(
+                    groupRt,
+                    $"HOLD_LAST_VALID card={cardRt.name} " +
+                    $"cardRect={FormatRect(cardRt.rect)} " +
+                    $"local={FormatVector(stableLocal)}");
+                return;
+            }
+
+            int columns = DetectMarketColumnCount(cardRt, out string reason);
+            bool twoColumn = columns <= 2;
+            float offsetX = twoColumn
+                ? WarehouseRefillPlugin.MaxLabelTwoColumnOffsetXValue
+                : WarehouseRefillPlugin.MaxLabelThreeColumnOffsetXValue;
+            float offsetY = twoColumn
+                ? WarehouseRefillPlugin.MaxLabelTwoColumnOffsetYValue
+                : WarehouseRefillPlugin.MaxLabelThreeColumnOffsetYValue;
+
+            groupRt.anchorMin = new Vector2(1f, 0f);
+            groupRt.anchorMax = new Vector2(1f, 0f);
+            groupRt.pivot = new Vector2(1f, 0f);
+            groupRt.sizeDelta = new Vector2(58f, 16f);
+
+            Vector2 beforeAnchored = groupRt.anchoredPosition;
+            groupRt.anchoredPosition = new Vector2(
+                -70f + offsetX,
+                8f + offsetY);
+
+            label.fontSize = 10f;
+            MaxDebugExpectedLocal[groupId] = groupRt.localPosition;
+
+            LogMaxState(
+                groupRt,
+                $"FALLBACK columns={columns} reason={reason} " +
+                $"cardRect={FormatRect(cardRt.rect)} " +
+                $"offset=({offsetX:0.##},{offsetY:0.##}) " +
+                $"beforeAnchored={FormatVector(beforeAnchored)} " +
+                $"afterAnchored={FormatVector(groupRt.anchoredPosition)} " +
+                $"afterLocal={FormatVector(groupRt.localPosition)}");
+        }
+
+        private static bool TryPositionLimitUnderStockCount(RectTransform cardRt, RectTransform groupRt, TextMeshProUGUI label)
+        {
+            TextMeshProUGUI lowestIntegerText = null;
+            float lowestY = float.PositiveInfinity;
+            float rightmostX = float.NegativeInfinity;
+            int integerCandidates = 0;
+
+            foreach (TextMeshProUGUI candidate in cardRt.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (candidate is null || candidate == label || !candidate.gameObject.activeInHierarchy ||
+                    candidate.transform.IsChildOf(groupRt))
+                {
+                    continue;
+                }
+
+                if (candidate.GetComponentInParent<TMP_InputField>() is not null)
+                {
+                    continue;
+                }
+
+                string value = candidate.text?.Trim();
+                if (string.IsNullOrEmpty(value) || !int.TryParse(value, out _))
+                {
+                    continue;
+                }
+
+                integerCandidates++;
+
+                RectTransform candidateRt = candidate.rectTransform;
+                if (candidateRt is null)
+                {
+                    continue;
+                }
+
+                Vector3 centerWorld = candidateRt.TransformPoint(
+                    new Vector3(candidateRt.rect.center.x, candidateRt.rect.center.y, 0f));
+                Vector3 centerLocal = cardRt.InverseTransformPoint(centerWorld);
+                if (!cardRt.rect.Contains(new Vector2(centerLocal.x, centerLocal.y)))
+                {
+                    continue;
+                }
+
+                if (centerLocal.y < lowestY - 0.5f ||
+                    (Mathf.Abs(centerLocal.y - lowestY) <= 0.5f && centerLocal.x > rightmostX))
+                {
+                    lowestIntegerText = candidate;
+                    lowestY = centerLocal.y;
+                    rightmostX = centerLocal.x;
+                }
+            }
+
+            if (lowestIntegerText is null)
+            {
+                LogMaxState(
+                    groupRt,
+                    $"NO_ANCHOR card={cardRt.name} cardRect={FormatRect(cardRt.rect)} " +
+                    $"integerCandidates={integerCandidates}");
+                return false;
+            }
+
+            RectTransform stockCountRt = lowestIntegerText.rectTransform;
+            Vector3 bottomRightWorld = stockCountRt.TransformPoint(
+                new Vector3(stockCountRt.rect.xMax, stockCountRt.rect.yMin, 0f));
+            Vector3 bottomRightLocal = cardRt.InverseTransformPoint(bottomRightWorld);
+
+            int columns = DetectMarketColumnCount(cardRt, out string reason);
+            bool twoColumn = columns <= 2;
+            float offsetX = twoColumn
+                ? WarehouseRefillPlugin.MaxLabelTwoColumnOffsetXValue
+                : WarehouseRefillPlugin.MaxLabelThreeColumnOffsetXValue;
+            float offsetY = twoColumn
+                ? WarehouseRefillPlugin.MaxLabelTwoColumnOffsetYValue
+                : WarehouseRefillPlugin.MaxLabelThreeColumnOffsetYValue;
+
+            Vector3 beforeLocal = groupRt.localPosition;
+            Vector2 beforeAnchored = groupRt.anchoredPosition;
+
+            groupRt.anchorMin = new Vector2(0.5f, 0.5f);
+            groupRt.anchorMax = new Vector2(0.5f, 0.5f);
+            groupRt.pivot = new Vector2(1f, 1f);
+            groupRt.sizeDelta = new Vector2(58f, 16f);
+            groupRt.localPosition = new Vector3(
+                bottomRightLocal.x + offsetX,
+                bottomRightLocal.y + offsetY,
+                0f);
+
+            float textScale = twoColumn
+                ? WarehouseRefillPlugin.MaxLabelTwoColumnTextScaleValue
+                : WarehouseRefillPlugin.MaxLabelThreeColumnTextScaleValue;
+
+            label.fontSize = Mathf.Clamp(
+                lowestIntegerText.fontSize * textScale,
+                MaxFontAbsoluteMin,
+                MaxFontAbsoluteMax);
+
+            int groupId = groupRt.GetInstanceID();
+            MaxDebugExpectedLocal[groupId] = groupRt.localPosition;
+            MaxGroupsWithValidAnchor.Add(groupId);
+
+            LogMaxState(
+                groupRt,
+                $"NORMAL columns={columns} reason={reason} " +
+                $"card={cardRt.name} cardRect={FormatRect(cardRt.rect)} " +
+                $"anchorText='{lowestIntegerText.text}' anchorName={lowestIntegerText.gameObject.name} " +
+                $"anchorLocalBR={FormatVector(bottomRightLocal)} " +
+                $"offset=({offsetX:0.##},{offsetY:0.##}) " +
+                $"beforeLocal={FormatVector(beforeLocal)} afterLocal={FormatVector(groupRt.localPosition)} " +
+                $"beforeAnchored={FormatVector(beforeAnchored)} afterAnchored={FormatVector(groupRt.anchoredPosition)}");
+            return true;
+        }
+
+        private static int DetectMarketColumnCount(RectTransform cardRt, out string reason)
+        {
+            Transform current = cardRt;
+            for (int depth = 0; depth < 8 && current is not null; depth++, current = current.parent)
+            {
+                GridLayoutGroup grid = current.GetComponent<GridLayoutGroup>();
+                if (grid is null)
+                {
+                    continue;
+                }
+
+                if (grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount &&
+                    grid.constraintCount > 0)
+                {
+                    reason = $"grid-fixed:{grid.constraintCount}@{current.name}";
+                    return Mathf.Clamp(grid.constraintCount, 1, 6);
+                }
+
+                RectTransform gridRt = current.GetComponent<RectTransform>();
+                if (gridRt is not null && grid.cellSize.x > 1f)
+                {
+                    float usableWidth =
+                        gridRt.rect.width -
+                        grid.padding.left -
+                        grid.padding.right;
+
+                    float stride = grid.cellSize.x + grid.spacing.x;
+                    if (usableWidth > 1f && stride > 1f)
+                    {
+                        int calculated = Mathf.Max(
+                            1,
+                            Mathf.FloorToInt((usableWidth + grid.spacing.x + 0.5f) / stride));
+
+                        reason =
+                            $"grid-calc:{calculated}@{current.name}" +
+                            $"[w={usableWidth:0.##},cell={grid.cellSize.x:0.##},space={grid.spacing.x:0.##}]";
+                        return Mathf.Clamp(calculated, 1, 6);
+                    }
+                }
+            }
+
+            float width = cardRt.rect.width;
+            int fallbackColumns = width >= 400f ? 2 : 3;
+            reason = $"card-width:{width:0.##}";
+            return fallbackColumns;
+        }
+
+        private static void LogMaxState(RectTransform groupRt, string state)
+        {
+            if (groupRt is null)
+            {
+                return;
+            }
+
+            int id = groupRt.GetInstanceID();
+            if (MaxDebugLastState.TryGetValue(id, out string previous) &&
+                previous == state)
+            {
+                return;
+            }
+
+            MaxDebugLastState[id] = state;
+            LogMaxDebug(state);
+        }
+
+        private static void LogMaxDebug(string message)
+        {
+            try
+            {
+                WarehouseRefillPlugin plugin = WarehouseRefillPlugin.Instance;
+                if (plugin is not null)
+                {
+                    plugin.Log.LogInfo($"[MAXDBG] {message}");
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static string FormatVector(Vector2 value)
+        {
+            return $"({value.x:0.##},{value.y:0.##})";
+        }
+
+        private static string FormatVector(Vector3 value)
+        {
+            return $"({value.x:0.##},{value.y:0.##},{value.z:0.##})";
+        }
+
+        private static string FormatRect(Rect value)
+        {
+            return $"({value.x:0.##},{value.y:0.##},{value.width:0.##},{value.height:0.##})";
         }
 
         private static void OpenGlobalEdit(int productId, TextMeshProUGUI textComp, RectTransform targetRt, TMP_FontAsset font)
@@ -676,74 +1134,231 @@ namespace WarehouseRefillPlus.UI
                 _cart = FindFirstObjectByType<MarketShoppingCart>(FindObjectsInactive.Include);
             }
 
-            if (_cart is not null)
+            if (_cart is null ||
+                _cart.gameObject is null ||
+                !_cart.gameObject.activeInHierarchy)
             {
-                if (_buyingPanelCache?.gameObject is null || _purchaseButtonCache?.gameObject is null)
-                {
-                    foreach (Transform trans in _computer.transform.GetComponentsInChildren<Transform>(true))
-                    {
-                        if (trans.name == "Purchase Button" && trans.parent is not null && trans.parent.name == "Buying Panel")
-                        {
-                            _purchaseButtonCache = trans;
-                            _buyingPanelCache = trans.parent;
-                            break;
-                        }
-                    }
-                }
-
-                if (_buyingPanelCache is not null && _buyingPanelCache.gameObject.activeInHierarchy)
-                {
-                    if (_buyingPanelCache.parent.Find("ClearCartButton") == null)
-                    {
-                        InjectClearButton(_buyingPanelCache, _purchaseButtonCache);
-                    }
-                }
+                return;
             }
+
+            // The old button was created next to the Purchase button and could
+            // overlap the totals/order panel. The cart popup already has a stable
+            // close button in its top-right header, so use that as the anchor.
+            Transform existingClear = FindCartDescendantByName("ClearCartButton");
+            if (existingClear is not null)
+            {
+                return;
+            }
+
+            Button closeButton = FindCartCloseButton();
+            if (closeButton is null ||
+                closeButton.gameObject is null ||
+                !closeButton.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            InjectClearButtonNextToClose(closeButton);
         }
 
-        private void InjectClearButton(Transform buyingPanel, Transform originalPurchaseButton)
+        private Transform FindCartDescendantByName(string objectName)
         {
-            Transform parent = buyingPanel.parent;
-            if (parent.Find("ClearCartButton") is not null)
+            if (_cart is null || _cart.gameObject is null)
+            {
+                return null;
+            }
+
+            foreach (Transform trans in _cart.GetComponentsInChildren<Transform>(true))
+            {
+                if (trans is not null && trans.name == objectName)
+                {
+                    return trans;
+                }
+            }
+
+            return null;
+        }
+
+        private Button FindCartCloseButton()
+        {
+            if (_cart is null || _cart.gameObject is null)
+            {
+                return null;
+            }
+
+            Button fallback = null;
+            float fallbackY = float.MinValue;
+            float fallbackX = float.MinValue;
+
+            foreach (Button btn in _cart.GetComponentsInChildren<Button>(true))
+            {
+                if (btn is null ||
+                    btn.gameObject is null ||
+                    !btn.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                string lowerName = (btn.name ?? string.Empty).ToLowerInvariant();
+
+                if (lowerName.Contains("clearcart") ||
+                    lowerName == "remove button" ||
+                    lowerName == "purchase button")
+                {
+                    continue;
+                }
+
+                // Prefer semantic names used by the native popup.
+                if (lowerName.Contains("close") ||
+                    lowerName.Contains("exit"))
+                {
+                    return btn;
+                }
+
+                // Some game prefabs use a generic button name and put only an X
+                // glyph in the child TMP object.
+                foreach (TextMeshProUGUI tmp in btn.GetComponentsInChildren<TextMeshProUGUI>(true))
+                {
+                    if (tmp is null)
+                    {
+                        continue;
+                    }
+
+                    string glyph = (tmp.text ?? string.Empty).Trim();
+                    if (glyph == "X" ||
+                        glyph == "x" ||
+                        glyph == "×" ||
+                        glyph == "✕" ||
+                        glyph == "✖")
+                    {
+                        return btn;
+                    }
+                }
+
+                // Final fallback: the native close button is the highest/rightmost
+                // active button in the cart popup.
+                Vector3 worldPos = btn.transform.position;
+                if (worldPos.y > fallbackY + 0.001f ||
+                    (Mathf.Abs(worldPos.y - fallbackY) <= 0.001f &&
+                     worldPos.x > fallbackX))
+                {
+                    fallback = btn;
+                    fallbackY = worldPos.y;
+                    fallbackX = worldPos.x;
+                }
+            }
+
+            return fallback;
+        }
+
+        private void InjectClearButtonNextToClose(Button closeButton)
+        {
+            if (closeButton is null || closeButton.transform.parent is null)
+            {
                 return;
+            }
+
+            Transform parent = closeButton.transform.parent;
+            if (parent.Find("ClearCartButton") is not null)
+            {
+                return;
+            }
+
+            RectTransform closeRt = closeButton.GetComponent<RectTransform>();
+            if (closeRt is null)
+            {
+                return;
+            }
+
+            const float clearWidth = 150f;
+            const float gap = 12f;
+
+            float closeWidth = Mathf.Max(40f, closeRt.rect.width);
+            float closeHeight = Mathf.Max(40f, closeRt.rect.height);
 
             GameObject clearBtnObj = new GameObject("ClearCartButton");
             clearBtnObj.transform.SetParent(parent, false);
-            RectTransform originalRt = originalPurchaseButton.GetComponent<RectTransform>();
-            RectTransform clearRt = clearBtnObj.AddComponent<RectTransform>();
-            clearRt.sizeDelta = originalRt.sizeDelta;
-            clearBtnObj.transform.position = originalPurchaseButton.position;
-            clearBtnObj.transform.localPosition += new Vector3(0f, 60f, 0f);
-            Image originalImg = originalPurchaseButton.GetComponent<Image>();
-            Image clearImg = clearBtnObj.AddComponent<Image>();
-            if (originalImg is not null)
-            {
-                clearImg.sprite = originalImg.sprite;
-                clearImg.type = originalImg.type;
-            }
 
-            clearImg.color = new Color(0.8f, 0.2f, 0.2f, 0.95f);
+            RectTransform clearRt = clearBtnObj.AddComponent<RectTransform>();
+            clearRt.anchorMin = closeRt.anchorMin;
+            clearRt.anchorMax = closeRt.anchorMax;
+            clearRt.pivot = closeRt.pivot;
+            clearRt.localScale = Vector3.one;
+            clearRt.localRotation = Quaternion.identity;
+            clearRt.sizeDelta = new Vector2(clearWidth, closeHeight);
+
+            // Place it immediately to the LEFT of the native X button.
+            clearRt.anchoredPosition = closeRt.anchoredPosition +
+                                       new Vector2(
+                                           -((closeWidth * 0.5f) + gap + (clearWidth * 0.5f)),
+                                           0f);
+
+            LayoutElement layout =
+                clearBtnObj.GetComponent<LayoutElement>() ??
+                clearBtnObj.AddComponent<LayoutElement>();
+            layout.ignoreLayout = true;
+
+            Image closeImg = closeButton.GetComponent<Image>();
+            Image clearImg = clearBtnObj.AddComponent<Image>();
+
+            // Deliberately DO NOT copy the native X-button sprite. That sprite
+            // has rounded corners. With no sprite the Unity Image is rendered as
+            // a plain solid rectangle.
+            clearImg.sprite = null;
+            clearImg.type = Image.Type.Simple;
+            clearImg.preserveAspect = false;
+
+            // Keep the same red family as the native close button.
+            clearImg.color = closeImg is not null
+                ? closeImg.color
+                : new Color(0.9f, 0.15f, 0.12f, 1f);
+
             Button clearBtn = clearBtnObj.AddComponent<Button>();
             clearBtn.targetGraphic = clearImg;
             clearBtn.onClick.AddListener(new Action(ClearCartNow));
+
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(clearBtnObj.transform, false);
-            TextMeshProUGUI originalText = originalPurchaseButton.GetComponentInChildren<TextMeshProUGUI>();
-            TextMeshProUGUI clearText = textObj.AddComponent<TextMeshProUGUI>();
-            if (originalText is not null)
-            {
-                clearText.font = originalText.font;
-                clearText.fontSize = originalText.fontSize;
-                clearText.alignment = originalText.alignment;
-            }
 
-            clearText.text = "CLEAR CART";
-            clearText.color = Color.white;
-            RectTransform textRt = textObj.GetComponent<RectTransform>();
+            RectTransform textRt = textObj.AddComponent<RectTransform>();
             textRt.anchorMin = Vector2.zero;
             textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = Vector2.zero;
-            textRt.offsetMax = Vector2.zero;
+            textRt.offsetMin = new Vector2(8f, 2f);
+            textRt.offsetMax = new Vector2(-8f, -2f);
+
+            TextMeshProUGUI clearText = textObj.AddComponent<TextMeshProUGUI>();
+            clearText.text = "Clear all";
+            clearText.color = Color.white;
+            clearText.alignment = TextAlignmentOptions.Center;
+            clearText.enableWordWrapping = false;
+            clearText.overflowMode = TextOverflowModes.Ellipsis;
+
+            // Reuse a native font from the cart header/button when possible.
+            TextMeshProUGUI sourceText =
+                closeButton.GetComponentInChildren<TextMeshProUGUI>(true);
+
+            if (sourceText is null && parent is not null)
+            {
+                foreach (TextMeshProUGUI tmp in parent.GetComponentsInChildren<TextMeshProUGUI>(true))
+                {
+                    if (tmp is not null && tmp.font is not null)
+                    {
+                        sourceText = tmp;
+                        break;
+                    }
+                }
+            }
+
+            if (sourceText is not null)
+            {
+                clearText.font = sourceText.font;
+            }
+
+            clearText.fontSize = Mathf.Clamp(closeHeight * 0.36f, 16f, 24f);
+
+            // Keep both custom and native close buttons above other header content.
+            clearBtnObj.transform.SetAsLastSibling();
+            closeButton.transform.SetAsLastSibling();
         }
 
         private void ClearCartNow()
