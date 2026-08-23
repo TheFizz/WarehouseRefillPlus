@@ -12,7 +12,7 @@ using WarehouseRefillPlus.UI;
 
 namespace WarehouseRefillPlus.Core
 {
-    [BepInPlugin("WarehouseRefillPlus", "Warehouse Refill Plus", "3.2.3")]
+    [BepInPlugin("WarehouseRefillPlus", "Warehouse Refill Plus", "3.2.4")]
     public class WarehouseRefillPlugin : BasePlugin
     {
         public static readonly Dictionary<int, int> ProductLimits = new Dictionary<int, int>();
@@ -80,7 +80,7 @@ namespace WarehouseRefillPlus.Core
         public static string LimitFilePath =>
             Path.Combine(Application.persistentDataPath, "SmartCartLimits.txt");
 
-        private const string ManagerDebugBuild = "2026-08-21-D11-HARDCODED-MAX";
+        private const string ManagerDebugBuild = "2026-08-23-D12-SALESITEM-FIX";
 
         private GameObject _uiManager;
         private bool _gameplaySceneReady;

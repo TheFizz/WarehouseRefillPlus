@@ -20,11 +20,42 @@ namespace WarehouseRefillPlus.Patches
         {
             try
             {
-                foreach (Type type in typeof(MarketShoppingCart).Assembly.GetTypes())
+                Assembly assembly = typeof(MarketShoppingCart).Assembly;
+                Type[] types;
+
+                try
                 {
-                    if (type.Name == "SalesItem")
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    // Some IL2CPP/BepInEx environments may fail to load
+                    // a small number of generated types.
+                    // Keep all successfully loaded types instead of
+                    // abandoning the SalesItem patch completely.
+                    types = ex.Types;
+                }
+
+                if (types == null)
+                    return null;
+
+                foreach (Type type in types)
+                {
+                    if (type == null)
+                        continue;
+
+                    try
                     {
-                        return AccessTools.Method(type, "Start");
+                        if (string.Equals(
+                                type.Name,
+                                "SalesItem",
+                                StringComparison.Ordinal))
+                        {
+                            return AccessTools.Method(type, "Start");
+                        }
+                    }
+                    catch
+                    {
                     }
                 }
             }
@@ -48,106 +79,155 @@ namespace WarehouseRefillPlus.Patches
                     return;
                 }
 
-                if (__instance.transform.Find("SmartLimitButtonGroup") != null)
-                {
-                    return;
-                }
+                Transform parent = __instance.transform;
 
-                int productId = -1;
+                if (parent.Find("SmartLimitButtonGroup") != null)
+                    return;
+
                 Type componentType = __instance.GetType();
 
                 if (!_reflectionCached)
                 {
-                    foreach (PropertyInfo propInfo in componentType.GetProperties())
+                    try
                     {
-                        if (!propInfo.CanRead ||
-                            propInfo.GetIndexParameters().Length != 0)
-                        {
-                            continue;
-                        }
+                        PropertyInfo[] properties =
+                            componentType.GetProperties();
 
-                        string propertyName =
-                            propInfo.Name.ToLower();
-
-                        if (propertyName is "productid" or "m_productid" or "id" or "itemid" &&
-                            propInfo.PropertyType == typeof(int))
+                        foreach (PropertyInfo propInfo in properties)
                         {
-                            _cachedPropInfo = propInfo;
-                            break;
+                            if (propInfo == null ||
+                                !propInfo.CanRead ||
+                                propInfo.GetIndexParameters().Length != 0)
+                            {
+                                continue;
+                            }
+
+                            string name =
+                                propInfo.Name.ToLowerInvariant();
+
+                            if ((name == "productid" ||
+                                 name == "m_productid" ||
+                                 name == "id" ||
+                                 name == "itemid") &&
+                                propInfo.PropertyType == typeof(int))
+                            {
+                                _cachedPropInfo = propInfo;
+                                break;
+                            }
                         }
+                    }
+                    catch
+                    {
                     }
 
                     if (_cachedPropInfo == null)
                     {
-                        foreach (FieldInfo fieldInfo in componentType.GetFields())
+                        try
                         {
-                            string fieldName =
-                                fieldInfo.Name.ToLower();
+                            FieldInfo[] fields =
+                                componentType.GetFields();
 
-                            if (fieldName is "productid" or "m_productid" or "id" or "itemid" &&
-                                fieldInfo.FieldType == typeof(int))
+                            foreach (FieldInfo fieldInfo in fields)
                             {
-                                _cachedFieldInfo = fieldInfo;
-                                break;
+                                if (fieldInfo == null)
+                                    continue;
+
+                                string name =
+                                    fieldInfo.Name.ToLowerInvariant();
+
+                                if ((name == "productid" ||
+                                     name == "m_productid" ||
+                                     name == "id" ||
+                                     name == "itemid") &&
+                                    fieldInfo.FieldType == typeof(int))
+                                {
+                                    _cachedFieldInfo = fieldInfo;
+                                    break;
+                                }
                             }
+                        }
+                        catch
+                        {
                         }
                     }
 
                     _reflectionCached = true;
                 }
 
+                int productId = -1;
+
                 if (_cachedPropInfo != null)
                 {
-                    productId =
-                        (int)_cachedPropInfo.GetValue(__instance)!;
+                    try
+                    {
+                        object value =
+                            _cachedPropInfo.GetValue(__instance);
+
+                        if (value != null)
+                            productId = (int)value;
+                    }
+                    catch
+                    {
+                        return;
+                    }
                 }
                 else if (_cachedFieldInfo != null)
                 {
-                    productId =
-                        (int)_cachedFieldInfo.GetValue(__instance)!;
+                    try
+                    {
+                        object value =
+                            _cachedFieldInfo.GetValue(__instance);
+
+                        if (value != null)
+                            productId = (int)value;
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    return;
                 }
 
                 if (productId <= 0)
-                {
                     return;
-                }
 
-                // KEY CHANGE:
-                // Do not create MarketAppUIEnhancer at plugin startup or scene load.
-                // SalesItem.Start is our Market-open signal. Only now, after Main
-                // Scene is already loaded and an actual product card is active,
-                // create the enhancer.
                 WarehouseRefillPlugin plugin =
                     WarehouseRefillPlugin.Instance;
 
-                if (plugin == null ||
-                    !plugin.EnsureMarketUIManagerForOpen(__instance.transform))
-                {
+                if (plugin == null)
                     return;
-                }
 
-                int instanceID =
-                    __instance.transform.GetInstanceID();
+                if (!plugin.EnsureMarketUIManagerForOpen(parent))
+                    return;
+
+                int instanceID = parent.GetInstanceID();
 
                 if (MarketAppUIEnhancer.QueuedParents.Contains(instanceID))
-                {
                     return;
+
+                TMP_FontAsset fontAsset = null;
+
+                try
+                {
+                    TextMeshProUGUI textMesh =
+                        parent.GetComponentInChildren<TextMeshProUGUI>();
+
+                    if (textMesh != null)
+                        fontAsset = textMesh.font;
                 }
-
-                TextMeshProUGUI textMesh =
-                    __instance.transform.GetComponentInChildren<TextMeshProUGUI>();
-
-                TMP_FontAsset fontAsset =
-                    textMesh != null
-                        ? textMesh.font
-                        : null;
+                catch
+                {
+                }
 
                 MarketAppUIEnhancer.QueuedParents.Add(instanceID);
 
                 MarketAppUIEnhancer.UIQueue.Add(
                     new UIJob
                     {
-                        Parent = __instance.transform,
+                        Parent = parent,
                         ProductId = productId,
                         Font = fontAsset
                     });

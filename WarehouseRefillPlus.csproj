@@ -6,9 +6,9 @@
     <Platforms>AnyCPU</Platforms>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <PackageId>WarehouseRefillPlus</PackageId>
-    <Version>3.2.3</Version>
-    <AssemblyVersion>3.2.3</AssemblyVersion>
-    <FileVersion>3.2.3</FileVersion>
+    <Version>3.2.4</Version>
+    <AssemblyVersion>3.2.4</AssemblyVersion>
+    <FileVersion>3.2.4</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
