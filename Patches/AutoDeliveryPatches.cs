@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 using WarehouseRefillPlus.Core;
@@ -50,6 +50,19 @@ namespace WarehouseRefillPlus.Patches
                 AutoDeliveryService.ProcessDeliveredBoxes(_lastDeliveredBoxes);
                 _lastDeliveredBoxes.Clear();
             }
+        }
+
+
+        // 3. RackSlot.AddBox kończy animację pudełka wywołaniem Box.ToggleInstanced(true).
+        // Prefix działa jeszcze zanim batching/instancing zapamięta transform.
+        [HarmonyPatch(typeof(Box), nameof(Box.ToggleInstanced))]
+        [HarmonyPrefix]
+        public static void Box_ToggleInstanced_Prefix(Box __instance, bool value)
+        {
+            if (!value || __instance == null)
+                return;
+
+            AutoDeliveryService.ApplyPendingFinalRackRotation(__instance);
         }
 
         // 2. Skrót F10 pozostaje dostępny niezależnie od ustawienia automatycznej dostawy.

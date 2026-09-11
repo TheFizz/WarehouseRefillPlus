@@ -1,10 +1,88 @@
 ﻿using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
 using UnityEngine;
 
 namespace WarehouseRefillPlus.Core
 {
     public static class AutoDeliveryService
     {
+        // Docelowa rotacja pudełka po zakończeniu natywnej animacji RackSlot.AddBox.
+        // Klucz = Unity InstanceID pudełka.
+        private static readonly Dictionary<int, Quaternion> _pendingFinalRackRotations =
+            new Dictionary<int, Quaternion>();
+
+        private static readonly FieldInfo _boxSoField =
+            AccessTools.Field(typeof(Box), "m_BoxSO");
+
+        /// <summary>
+        /// RackSlot.AddBox animuje rotację przez DOTween, a na końcu wywołuje
+        /// Box.ToggleInstanced(true). W tym dokładnym momencie wymuszamy jeszcze raz
+        /// rotację wynikającą z BoxSO.GridLayout.boxAngle, zanim batching/instancing
+        /// zapamięta transform pudełka.
+        /// </summary>
+        public static void ApplyPendingFinalRackRotation(Box box)
+        {
+            if (box == null)
+                return;
+
+            int id = box.GetInstanceID();
+            if (!_pendingFinalRackRotations.TryGetValue(id, out Quaternion targetRotation))
+                return;
+
+            _pendingFinalRackRotations.Remove(id);
+
+            try
+            {
+                Vector3 beforeEuler = box.transform.localEulerAngles;
+                box.transform.localRotation = targetRotation;
+
+                Rigidbody rb = box.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    rb.isKinematic = true;
+                }
+
+                WarehouseRefillPlugin.Instance.Log.LogInfo(
+                    $"[AUTO-RACK ROT] box={box.BoxID} product={box.Data?.ProductID ?? 0} " +
+                    $"before=({beforeEuler.x:F1},{beforeEuler.y:F1},{beforeEuler.z:F1}) " +
+                    $"final=({box.transform.localEulerAngles.x:F1}," +
+                    $"{box.transform.localEulerAngles.y:F1}," +
+                    $"{box.transform.localEulerAngles.z:F1})");
+            }
+            catch (System.Exception ex)
+            {
+                WarehouseRefillPlugin.Instance.Log.LogWarning(
+                    $"[AUTO-RACK ROT] Nie udało się ustawić końcowej rotacji: {ex.Message}");
+            }
+        }
+
+        private static Quaternion GetNativeRackRotation(Box box)
+        {
+            try
+            {
+                BoxSO boxSo = _boxSoField?.GetValue(box) as BoxSO;
+                if (boxSo != null && boxSo.GridLayout != null)
+                {
+                    Vector3 angle = boxSo.GridLayout.boxAngle;
+
+                    // Kartony były już ustawione równo, ale tyłem do przodu.
+                    // Obracamy je o 180° wokół osi Y, zachowując natywny kąt layoutu.
+                    angle.y += 180f;
+
+                    return Quaternion.Euler(angle);
+                }
+            }
+            catch
+            {
+                // Fallback poniżej.
+            }
+
+            return Quaternion.Euler(0f, 180f, 0f);
+        }
+
         // Obsługa automatycznej dostawy (pudła na ulicy)
         public static void ProcessDeliveredBoxes(List<GameObject> boxObjects)
         {
@@ -70,13 +148,33 @@ namespace WarehouseRefillPlus.Core
                             rb.isKinematic = true;
                         }
 
-                        // RackSlot.AddBox sam ustawia właściwy parent, localPosition,
-                        // localRotation oraz układ pudełka w slocie.
-                        slot.AddBox(box.BoxID, box, true);
-
-                        // Flagi ustawiamy dopiero po natywnym dodaniu do regału.
+                        // Odtwarzamy kolejność używaną przez natywne BoxInteraction.PlaceBoxToRack().
+                        // Racked musi być ustawione PRZED RackSlot.AddBox().
                         box.Racked = true;
-                        try { box.SetStatic(true); } catch { }
+
+                        // Natywna ścieżka zwalnia również ewentualne zajęcie pudełka.
+                        try { box.SetOccupy(false, null); } catch { }
+
+                        // Zapisujemy DOKŁADNĄ rotację, której używa RackSlot.AddBox:
+                        // BoxSO.GridLayout.boxAngle. Nie prostujemy pudełka za wcześnie,
+                        // bo AddBox uruchamia własny tween rotacji.
+                        int instanceId = box.GetInstanceID();
+                        _pendingFinalRackRotations[instanceId] = GetNativeRackRotation(box);
+
+                        try
+                        {
+                            slot.AddBox(box.BoxID, box, true);
+                        }
+                        catch
+                        {
+                            _pendingFinalRackRotations.Remove(instanceId);
+                            throw;
+                        }
+
+                        // Nie wywołujemy SetStatic(true).
+                        // Końcowa korekta zostanie wykonana w Prefixie Box.ToggleInstanced(true),
+                        // czyli dokładnie po zakończeniu animacji AddBox i PRZED zapisaniem
+                        // transformu do renderowania instancjonowanego.
 
                         return true;
                     }

@@ -10,11 +10,11 @@
         "projectUniqueName": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
         "projectName": "WarehouseRefillPlus",
         "projectPath": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\WarehouseRefillPlus.csproj",
-        "packagesPath": "C:\\Users\\tmjci.DESKTOP-SBSICJ8\\.nuget\\packages\\",
+        "packagesPath": "C:\\Users\\tmjci\\.nuget\\packages\\",
         "outputPath": "G:\\Mój dysk\\SupermarketSimulator_Dev\\Projects\\WarehouseRefillPlus\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\tmjci.DESKTOP-SBSICJ8\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\tmjci\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
