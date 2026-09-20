@@ -8,3 +8,17 @@ D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefil
 D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\refint\WarehouseRefillPlus.dll
 D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.pdb
 D:\Workspace\Common\Modding\Supermarket Simulator\WarehouseRefill\WarehouseRefillPlus\obj\Release\ref\WarehouseRefillPlus.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.deps.json
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\bin\Release\WarehouseRefillPlus.pdb
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\bin\Release\0Harmony.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\bin\Release\UnityEngine.PhysicsModule.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.csproj.AssemblyReference.cache
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.GeneratedMSBuildEditorConfig.editorconfig
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.csproj.CoreCompileInputs.cache
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.sourcelink.json
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\Warehous.D33C4E81.Up2Date
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\refint\WarehouseRefillPlus.dll
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\WarehouseRefillPlus.pdb
+G:\Mój dysk\SupermarketSimulator_Dev\Projects\WarehouseRefillPlus\obj\Release\ref\WarehouseRefillPlus.dll

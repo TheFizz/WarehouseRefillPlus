@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
@@ -6,8 +7,8 @@ using WarehouseRefillPlus.UI;
 namespace WarehouseRefillPlus.Core
 {
     /// <summary>
-    /// Clears references owned by the previous gameplay scene while keeping the
-    /// persistent MarketAppUIEnhancer component alive.
+    /// Clears references and processed UI state owned by the previous gameplay
+    /// scene. Persistent product limits are intentionally not touched.
     /// </summary>
     internal static class MarketAppUIStateReset
     {
@@ -24,6 +25,21 @@ namespace WarehouseRefillPlus.Core
                 "_checkTimer",
                 InstanceFlags);
 
+        private static readonly FieldInfo MarketOpenReadyTimerField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "_marketOpenReadyTimer",
+                InstanceFlags);
+
+        private static readonly FieldInfo QueueReadyLoggedField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "_queueReadyLogged",
+                InstanceFlags);
+
+        private static readonly FieldInfo MaxDebugStartupLoggedField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "_maxDebugStartupLogged",
+                InstanceFlags);
+
         private static readonly FieldInfo CartField =
             typeof(MarketAppUIEnhancer).GetField(
                 "_cart",
@@ -37,6 +53,11 @@ namespace WarehouseRefillPlus.Core
         private static readonly FieldInfo MarketContentField =
             typeof(MarketAppUIEnhancer).GetField(
                 "_marketContentCache",
+                InstanceFlags);
+
+        private static readonly FieldInfo MarketRootField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "_marketRootCache",
                 InstanceFlags);
 
         private static readonly FieldInfo BuyingPanelField =
@@ -94,21 +115,46 @@ namespace WarehouseRefillPlus.Core
                 "_editingProductId",
                 StaticFlags);
 
+        private static readonly FieldInfo MaxDebugLastStateField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "MaxDebugLastState",
+                StaticFlags);
+
+        private static readonly FieldInfo MaxDebugExpectedLocalField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "MaxDebugExpectedLocal",
+                StaticFlags);
+
+        private static readonly FieldInfo MaxGroupsWithValidAnchorField =
+            typeof(MarketAppUIEnhancer).GetField(
+                "MaxGroupsWithValidAnchor",
+                StaticFlags);
+
         public static void Reset(
             MarketAppUIEnhancer enhancer)
         {
+            MarketAppUIEnhancer.UIQueue.Clear();
+            MarketAppUIEnhancer.QueuedParents.Clear();
+
+            ClearCollection(SpriteCacheField, null);
+            ClearCollection(MaxDebugLastStateField, null);
+            ClearCollection(MaxDebugExpectedLocalField, null);
+            ClearCollection(MaxGroupsWithValidAnchorField, null);
+            ResetGlobalInput();
+
             if (enhancer == null)
             {
                 return;
             }
 
-            MarketAppUIEnhancer.UIQueue.Clear();
-            MarketAppUIEnhancer.QueuedParents.Clear();
-
             SetInstanceField(CheckTimerField, enhancer, 0f);
+            SetInstanceField(MarketOpenReadyTimerField, enhancer, 0f);
+            SetInstanceField(QueueReadyLoggedField, enhancer, false);
+            SetInstanceField(MaxDebugStartupLoggedField, enhancer, false);
             SetInstanceField(CartField, enhancer, null);
             SetInstanceField(ComputerField, enhancer, null);
             SetInstanceField(MarketContentField, enhancer, null);
+            SetInstanceField(MarketRootField, enhancer, null);
             SetInstanceField(BuyingPanelField, enhancer, null);
             SetInstanceField(PurchaseButtonField, enhancer, null);
             SetInstanceField(TaskbarField, enhancer, null);
@@ -122,14 +168,6 @@ namespace WarehouseRefillPlus.Core
                 SmartLimitGroupsField,
                 enhancer);
 
-            // Sprites and their runtime textures can become invalid after the old
-            // scene is unloaded. A cleared cache forces both embedded icons to be
-            // loaded again for the new computer UI.
-            ClearCollection(
-                SpriteCacheField,
-                null);
-
-            ResetGlobalInput();
         }
 
         private static void ResetGlobalInput()
@@ -175,7 +213,12 @@ namespace WarehouseRefillPlus.Core
             if (collection is IList list)
             {
                 list.Clear();
+                return;
             }
+
+            collection?.GetType()
+                .GetMethod("Clear", Type.EmptyTypes)
+                ?.Invoke(collection, null);
         }
 
         private static void SetInstanceField(

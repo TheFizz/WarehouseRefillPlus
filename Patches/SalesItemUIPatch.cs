@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using TMPro;
@@ -69,6 +70,11 @@ namespace WarehouseRefillPlus.Patches
         [HarmonyPostfix]
         public static void Postfix(Component __instance)
         {
+            EnsureSalesItem(__instance);
+        }
+
+        internal static bool EnsureSalesItem(Component __instance)
+        {
             try
             {
                 if (__instance == null ||
@@ -76,13 +82,13 @@ namespace WarehouseRefillPlus.Patches
                     __instance.gameObject == null ||
                     !__instance.gameObject.activeInHierarchy)
                 {
-                    return;
+                    return false;
                 }
 
                 Transform parent = __instance.transform;
 
                 if (parent.Find("SmartLimitButtonGroup") != null)
-                    return;
+                    return true;
 
                 Type componentType = __instance.GetType();
 
@@ -168,7 +174,7 @@ namespace WarehouseRefillPlus.Patches
                     }
                     catch
                     {
-                        return;
+                        return false;
                     }
                 }
                 else if (_cachedFieldInfo != null)
@@ -183,30 +189,34 @@ namespace WarehouseRefillPlus.Patches
                     }
                     catch
                     {
-                        return;
+                        return false;
                     }
                 }
                 else
                 {
-                    return;
+                    return false;
                 }
 
                 if (productId <= 0)
-                    return;
+                    return false;
 
                 WarehouseRefillPlugin plugin =
                     WarehouseRefillPlugin.Instance;
 
                 if (plugin == null)
-                    return;
+                    return false;
 
                 if (!plugin.EnsureMarketUIManagerForOpen(parent))
-                    return;
+                    return false;
+
+                int worldToken = plugin.CurrentWorldToken;
+                if (worldToken == 0)
+                    return false;
 
                 int instanceID = parent.GetInstanceID();
 
                 if (MarketAppUIEnhancer.QueuedParents.Contains(instanceID))
-                    return;
+                    return true;
 
                 TMP_FontAsset fontAsset = null;
 
@@ -228,13 +238,93 @@ namespace WarehouseRefillPlus.Patches
                     new UIJob
                     {
                         Parent = parent,
+                        ParentInstanceId = instanceID,
                         ProductId = productId,
+                        WorldToken = worldToken,
                         Font = fontAsset
                     });
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(ProductViewer), "OnEnable")]
+    internal static class ProductViewerUIBootstrapPatch
+    {
+        private static readonly HashSet<int> BootstrappedViewers = new();
+
+        [HarmonyPostfix]
+        private static void Postfix(ProductViewer __instance)
+        {
+            try
+            {
+                if (__instance == null ||
+                    __instance.gameObject == null ||
+                    !__instance.gameObject.activeInHierarchy)
+                {
+                    return;
+                }
+
+                int viewerId = __instance.GetInstanceID();
+                if (BootstrappedViewers.Contains(viewerId))
+                {
+                    return;
+                }
+
+                Transform content = __instance.ProductsContentParent;
+                if (content == null ||
+                    content.gameObject == null ||
+                    !content.gameObject.activeInHierarchy)
+                {
+                    return;
+                }
+
+                int readyCards = 0;
+                for (int i = 0; i < content.childCount; i++)
+                {
+                    Transform child = content.GetChild(i);
+                    if (child == null ||
+                        child.gameObject == null ||
+                        !child.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    SalesItem salesItem = child.GetComponent<SalesItem>();
+                    if (salesItem != null &&
+                        SalesItemUIPatch.EnsureSalesItem(salesItem))
+                    {
+                        readyCards++;
+                    }
+                }
+
+                if (readyCards == 0)
+                {
+                    return;
+                }
+
+                BootstrappedViewers.Add(viewerId);
+
+                WarehouseRefillPlugin plugin = WarehouseRefillPlugin.Instance;
+                if (plugin != null)
+                {
+                    plugin.Log.LogInfo(
+                        $"[WRP] Market UI ready. Existing cards bootstrap={readyCards}");
+                }
             }
             catch
             {
             }
+        }
+
+        internal static void ResetSceneState()
+        {
+            BootstrappedViewers.Clear();
         }
     }
 }

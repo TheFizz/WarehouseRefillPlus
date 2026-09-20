@@ -8,11 +8,12 @@ using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using WarehouseRefillPlus.Patches;
 using WarehouseRefillPlus.UI;
 
 namespace WarehouseRefillPlus.Core
 {
-    [BepInPlugin("WarehouseRefillPlus", "Warehouse Refill Plus", "3.2.4")]
+    [BepInPlugin("WarehouseRefillPlus", "Warehouse Refill Plus", "3.2.5")]
     public class WarehouseRefillPlugin : BasePlugin
     {
         public static readonly Dictionary<int, int> ProductLimits = new Dictionary<int, int>();
@@ -84,6 +85,11 @@ namespace WarehouseRefillPlus.Core
 
         private GameObject _uiManager;
         private bool _gameplaySceneReady;
+        private int _activeWorldToken;
+        private int _lastWorldToken;
+        private Action<Scene, LoadSceneMode> _sceneLoadedHandler;
+
+        internal int CurrentWorldToken => _activeWorldToken;
 
         public override void Load()
         {
@@ -97,6 +103,7 @@ namespace WarehouseRefillPlus.Core
                 "Disable this option to leave deliveries in the normal delivery area. " +
                 "The F10 manual rack shortcut remains available.");
 
+#pragma warning disable CS0162 // Intentional compile-time feature switch.
             if (ShowMaxLabelConfig)
             {
                 MaxLabelTwoColumnOffsetX = Config.Bind(
@@ -154,6 +161,7 @@ namespace WarehouseRefillPlus.Core
                         new AcceptableValueRange<float>(0.30f, 2.00f)));
 
             }
+#pragma warning restore CS0162
 
             LoadLimits();
 
@@ -162,8 +170,8 @@ namespace WarehouseRefillPlus.Core
             // SignIn/Main Menu do not yet have the final store computer/Market UI.
             ClassInjector.RegisterTypeInIl2Cpp<MarketAppUIEnhancer>();
 
-            SceneManager.add_sceneLoaded(
-                new Action<Scene, LoadSceneMode>(OnSceneLoaded));
+            _sceneLoadedHandler = OnSceneLoaded;
+            SceneManager.add_sceneLoaded(_sceneLoadedHandler);
 
             Harmony harmony =
                 new Harmony("WarehouseRefillPlus.patch");
@@ -188,14 +196,7 @@ namespace WarehouseRefillPlus.Core
                 return;
             }
 
-            // Any jobs/references from the previous scene are invalid now.
-            MarketAppUIEnhancer.UIQueue.Clear();
-            MarketAppUIEnhancer.QueuedParents.Clear();
-
-            // The manager is deliberately NOT persistent anymore.
-            // A manager created in the previous scene is destroyed by Unity with
-            // that scene; clear our managed reference and wait for Market to open.
-            _uiManager = null;
+            DetachWorld();
 
             _gameplaySceneReady =
                 string.Equals(
@@ -205,6 +206,8 @@ namespace WarehouseRefillPlus.Core
 
             if (_gameplaySceneReady)
             {
+                TryAttachCurrentWorld();
+
                 Log.LogInfo(
                     $"[MAXDBG] SCENE READY name='{scene.name}' " +
                     $"buildIndex={scene.buildIndex}. Waiting for Market SalesItem.Start.");
@@ -225,7 +228,7 @@ namespace WarehouseRefillPlus.Core
         public bool EnsureMarketUIManagerForOpen(
             Transform salesItemTransform)
         {
-            if (!_gameplaySceneReady)
+            if (!_gameplaySceneReady || !TryAttachCurrentWorld())
             {
                 return false;
             }
@@ -265,7 +268,16 @@ namespace WarehouseRefillPlus.Core
                     $"scene='{SceneManager.GetActiveScene().name}' " +
                     $"managerId={_uiManager.GetInstanceID()} " +
                     $"enhancerId={enhancer.GetInstanceID()}");
+
+                Log.LogInfo(
+                    $"[WRP] MARKET OPEN -> enhancer created " +
+                    $"token={_activeWorldToken}.");
+
+                Log.LogInfo("[WRP] Enhancer ready for current Market UI.");
+
             }
+
+            enhancer.ObserveSalesItem(salesItemTransform);
 
             if (!_uiManager.activeSelf)
             {
@@ -273,6 +285,85 @@ namespace WarehouseRefillPlus.Core
             }
 
             return enhancer != null;
+        }
+
+        private bool TryAttachCurrentWorld()
+        {
+            int worldToken = ReadWorldToken();
+            if (worldToken == 0)
+            {
+                return false;
+            }
+
+            if (_activeWorldToken == worldToken)
+            {
+                return true;
+            }
+
+            if (_activeWorldToken != 0)
+            {
+                Log.LogInfo("[WRP] New world detected; reinitializing UI.");
+                DetachWorld();
+            }
+            else if (_lastWorldToken != 0 && _lastWorldToken != worldToken)
+            {
+                Log.LogInfo("[WRP] New world detected; reinitializing UI.");
+            }
+
+            _activeWorldToken = worldToken;
+            _lastWorldToken = worldToken;
+
+            Log.LogInfo($"[WRP] WORLD ATTACH token={worldToken}");
+            Log.LogInfo("[WRP] Waiting for fresh Market SalesItem.Start.");
+            return true;
+        }
+
+        private static int ReadWorldToken()
+        {
+            try
+            {
+                if (!IDManager.HasInstance || IDManager.Instance == null)
+                {
+                    return 0;
+                }
+
+                return IDManager.Instance.GetInstanceID();
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private void DetachWorld()
+        {
+            int oldToken = _activeWorldToken;
+
+            MarketAppUIEnhancer enhancer = null;
+            if (_uiManager != null)
+            {
+                enhancer = _uiManager.GetComponent<MarketAppUIEnhancer>();
+            }
+
+            MarketAppUIStateReset.Reset(enhancer);
+            MarketAppUIEnhancerPerformancePatch.ResetSceneState();
+            ProductViewerUIBootstrapPatch.ResetSceneState();
+            AutoDeliveryService.ClearSceneState();
+
+            if (_uiManager != null)
+            {
+                UnityEngine.Object.Destroy(_uiManager);
+            }
+
+            _uiManager = null;
+            _activeWorldToken = 0;
+
+            if (oldToken != 0)
+            {
+                Log.LogInfo($"[WRP] WORLD DETACH oldToken={oldToken}");
+            }
+
+            Log.LogInfo("[WRP] Scene caches cleared.");
         }
 
         private static string GetTransformPath(

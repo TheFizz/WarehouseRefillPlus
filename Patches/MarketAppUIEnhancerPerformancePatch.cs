@@ -32,6 +32,17 @@ namespace WarehouseRefillPlus.Patches
         private static int _cachedRackCount = -1;
         private static float _snapshotBuiltAt = -1000f;
 
+        internal static void ResetSceneState()
+        {
+            CapacityByProduct.Clear();
+            SingleSlotCapacityByProduct.Clear();
+            _rackManager = null;
+            _idManager = null;
+            _hasSnapshot = false;
+            _cachedRackCount = -1;
+            _snapshotBuiltAt = -1000f;
+        }
+
         [HarmonyPrefix]
         private static bool Prefix(int productId, ref int __result)
         {

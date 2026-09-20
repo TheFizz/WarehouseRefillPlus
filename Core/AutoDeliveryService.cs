@@ -15,6 +15,11 @@ namespace WarehouseRefillPlus.Core
         private static readonly FieldInfo _boxSoField =
             AccessTools.Field(typeof(Box), "m_BoxSO");
 
+        internal static void ClearSceneState()
+        {
+            _pendingFinalRackRotations.Clear();
+        }
+
         /// <summary>
         /// RackSlot.AddBox animuje rotację przez DOTween, a na końcu wywołuje
         /// Box.ToggleInstanced(true). W tym dokładnym momencie wymuszamy jeszcze raz

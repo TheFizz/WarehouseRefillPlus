@@ -29,8 +29,11 @@ namespace WarehouseRefillPlus.UI
         private MarketShoppingCart _cart;
         private Computer _computer;
         private Transform _marketContentCache;
+        private Transform _marketRootCache;
+#pragma warning disable CS0414 // Retained scene caches are reset by lifecycle cleanup.
         private Transform _buyingPanelCache;
         private Transform _purchaseButtonCache;
+#pragma warning restore CS0414
         private Transform _taskbarTransformCache;
         private Transform _cartButtonTransformCache;
 
@@ -53,6 +56,50 @@ namespace WarehouseRefillPlus.UI
         private static readonly Dictionary<int, string> MaxDebugLastState = new();
         private static readonly Dictionary<int, Vector3> MaxDebugExpectedLocal = new();
         private static readonly HashSet<int> MaxGroupsWithValidAnchor = new();
+
+        internal void ObserveSalesItem(Transform salesItemTransform)
+        {
+            if (salesItemTransform == null || salesItemTransform.gameObject == null)
+            {
+                return;
+            }
+
+            Transform content = salesItemTransform.parent;
+            if (content != null && content.gameObject != null)
+            {
+                _marketContentCache = content;
+            }
+
+            Transform current = salesItemTransform;
+            Transform namedMarketRoot = null;
+            int depth = 0;
+
+            while (current != null && depth < 12)
+            {
+                if (string.Equals(current.name, "Market App", StringComparison.Ordinal))
+                {
+                    namedMarketRoot = current;
+                }
+
+                AppWindow appWindow = current.GetComponent<AppWindow>();
+                if (appWindow != null)
+                {
+                    _marketRootCache = current;
+                    break;
+                }
+
+                current = current.parent;
+                depth++;
+            }
+
+            if ((_marketRootCache == null || _marketRootCache.gameObject == null) &&
+                namedMarketRoot != null)
+            {
+                _marketRootCache = namedMarketRoot;
+            }
+
+            TryResolveTaskbarFromMarketRoot();
+        }
 
         public void Update()
         {
@@ -103,10 +150,27 @@ namespace WarehouseRefillPlus.UI
                     UIQueue.RemoveAt(0);
                     jobsToInspect--;
 
-                    if (job is null ||
-                        job.Parent is null ||
-                        job.Parent.gameObject is null)
+                    if (job is null)
                     {
+                        jobsProcessed++;
+                        continue;
+                    }
+
+                    int currentWorldToken =
+                        WarehouseRefillPlugin.Instance?.CurrentWorldToken ?? 0;
+
+                    if (job.WorldToken == 0 ||
+                        job.WorldToken != currentWorldToken)
+                    {
+                        QueuedParents.Remove(job.ParentInstanceId);
+                        jobsProcessed++;
+                        continue;
+                    }
+
+                    if (job.Parent == null ||
+                        job.Parent.gameObject == null)
+                    {
+                        QueuedParents.Remove(job.ParentInstanceId);
                         jobsProcessed++;
                         continue;
                     }
@@ -119,7 +183,7 @@ namespace WarehouseRefillPlus.UI
                         continue;
                     }
 
-                    int parentId = job.Parent.GetInstanceID();
+                    int parentId = job.ParentInstanceId;
 
                     LogMaxDebug(
                         $"QUEUE PROCESS product={job.ProductId} " +
@@ -969,13 +1033,22 @@ namespace WarehouseRefillPlus.UI
 
         private void FindMarketContent()
         {
-            if (_computer is null)
-                return;
-
             bool isMarketActive = _marketContentCache?.gameObject is not null && _marketContentCache.gameObject.activeInHierarchy;
             if (!isMarketActive)
             {
-                foreach (LayoutGroup group in _computer.GetComponentsInChildren<LayoutGroup>(false))
+                Transform searchRoot =
+                    _marketRootCache != null && _marketRootCache.gameObject != null
+                        ? _marketRootCache
+                        : _computer != null && _computer.gameObject != null
+                            ? _computer.transform
+                            : null;
+
+                if (searchRoot == null)
+                {
+                    return;
+                }
+
+                foreach (LayoutGroup group in searchRoot.GetComponentsInChildren<LayoutGroup>(false))
                 {
                     if (group.name == "Content" && group.transform.childCount > 0)
                     {
@@ -998,6 +1071,13 @@ namespace WarehouseRefillPlus.UI
         private void CheckAndCreateRefillButton()
         {
             if (_taskbarTransformCache?.gameObject is null)
+            {
+                TryResolveTaskbarFromMarketRoot();
+            }
+
+            if (_taskbarTransformCache?.gameObject is null &&
+                _computer != null &&
+                _computer.gameObject != null)
             {
                 foreach (Transform trans in _computer.GetComponentsInChildren<Transform>(true))
                 {
@@ -1055,6 +1135,31 @@ namespace WarehouseRefillPlus.UI
 
                         refillButton.onClick.AddListener(new Action(OnRefillClick));
                     }
+                }
+            }
+        }
+
+        private void TryResolveTaskbarFromMarketRoot()
+        {
+            if (_taskbarTransformCache != null &&
+                _taskbarTransformCache.gameObject != null)
+            {
+                return;
+            }
+
+            if (_marketRootCache == null || _marketRootCache.gameObject == null)
+            {
+                return;
+            }
+
+            foreach (Transform trans in _marketRootCache.GetComponentsInChildren<Transform>(true))
+            {
+                if (trans != null &&
+                    trans.gameObject != null &&
+                    string.Equals(trans.name, "Taskbar", StringComparison.Ordinal))
+                {
+                    _taskbarTransformCache = trans;
+                    return;
                 }
             }
         }
